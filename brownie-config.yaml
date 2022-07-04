@@ -22,6 +22,7 @@ networks:
     link: "0x01be23585060835e02b77ef475b0cc51aa1e0709"
     weth: "0x6168499c0cFfCaCD319c818142124B7A15E857ab"
     token0: "0x4aAded56bd7c69861E8654719195fCA9C670EB45"
+    verify: True
   mainnet-fork:
     coordinator: "0x271682deb8c4e0901d1a1550ad2e64d568e69909"
     keyhash: "0xff8dedfbfa60af186cf3c830acbc32c05aae823045ae5ea7da1e45fbfaba4f92"
