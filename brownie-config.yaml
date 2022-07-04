@@ -1,0 +1,43 @@
+# exclude SafeMath when calculating test coverage
+# https://eth-brownie.readthedocs.io/en/v1.10.3/config.html#exclude_paths
+reports:
+  exclude_contracts:
+    - SafeMath
+depedencies:
+  - smartcontractkit/chainlink-brownie-contracts@0.4.1
+  - OpenZeppelin/openzeppelin-contracts@4.5.0
+compiler:
+  solc:
+    optimizer:
+      enabled: true
+      runs: 200
+    remappings:
+      - "@chainlink=smartcontractkit/chainlink-brownie-contracts@0.4.1"
+      - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@4.5.0"
+networks:
+  default: rinkeby
+  rinkeby:
+    coordinator: "0x6168499c0cffcacd319c818142124b7a15e857ab"
+    keyhash: "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc"
+    link: "0x01be23585060835e02b77ef475b0cc51aa1e0709"
+    weth: "0x6168499c0cFfCaCD319c818142124B7A15E857ab"
+    token0: "0x4aAded56bd7c69861E8654719195fCA9C670EB45"
+  mainnet-fork:
+    coordinator: "0x271682deb8c4e0901d1a1550ad2e64d568e69909"
+    keyhash: "0xff8dedfbfa60af186cf3c830acbc32c05aae823045ae5ea7da1e45fbfaba4f92"
+    link: "0x514910771af9ca656af840dff83e8264ecf986ca"
+    weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    dai: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    cmd_settings:
+      unlock:
+        - 0x000000000000000000000000000000000000dEaD #burn address
+        - 0xf977814e90da44bfa03b6295a0616a897441acec
+console:
+  show_colors: true
+  color_style: monokai
+  auto_suggest: true
+  completions: true
+  editing_mode: emacs
+dotenv: .env
+wallets:
+  from_mnemonic: ${MNEMONIC}
