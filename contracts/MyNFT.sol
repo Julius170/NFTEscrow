@@ -3,6 +3,7 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
@@ -12,6 +13,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "../interfaces/IWETH.sol";
 
 /**
  * @title MyNFT (Non-Fungible Token)
@@ -30,6 +32,7 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
     string private baseURI;
     uint256 private _maxSupply;
     uint256 private _mintingPrice;
+    address private WETH;
     Counters.Counter private _totalSupply;
 
     // Mapping from token id to token owners
@@ -56,13 +59,15 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
         string memory symbol_,
         string memory baseURI_,
         uint256 mintingPrice,
-        uint256 maxSupply_
+        uint256 maxSupply_,
+        address _weth
     ) {
         _name = name_;
         _symbol = symbol_;
         _maxSupply = maxSupply_;
         baseURI = baseURI_;
         _mintingPrice = mintingPrice;
+        WETH = _weth;
     }
 
     /**
@@ -543,9 +548,18 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
     function buyMyNFT(uint256 amount_) external payable {
         require(amount_ > 0, "ERC721: mint amount must be positive");
         require(_calculatePayment(amount_) == msg.value);
+        IWETH(WETH).deposit{value: msg.value}();
+        assert(IWETH(WETH).transfer(address(this), msg.value));
         for (uint256 i = 1; i <= amount_; i++) {
             _totalSupply.increment();
             _safeMint(msg.sender, _totalSupply.current(), "");
         }
+    }
+
+    function claimPayment() external onlyOwner {
+        IWETH weth = IWETH(WETH);
+        weth.withdraw(IERC20(WETH).balanceOf(address(this)));
+        (bool status, ) = msg.sender.call{value: IERC20(WETH).balanceOf(address(this))}("");
+        require(status);
     }
 }
