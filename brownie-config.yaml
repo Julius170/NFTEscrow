@@ -21,7 +21,7 @@ networks:
     keyhash: "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc"
     link: "0x01be23585060835e02b77ef475b0cc51aa1e0709"
     weth: "0xc778417E063141139Fce010982780140Aa0cD5Ab"
-    faketoken: "0x5657911058be1ed4156be7BA0bE69C607FBaaB76"
+    faketoken: "0x9040C089c544957FE4b55d27A81b4654bFD6728b"
     verify: True
 console:
   show_colors: true
