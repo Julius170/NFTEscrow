@@ -1,6 +1,20 @@
 from brownie import *
 from brownie import ManagerVrf, MyNFT, EscrowNFT
 from scripts.help_scripts import get_account
+from sys import exit
+
+
+def checkBalanceAndFaucet(account, secAcc):
+    fakeToken = Contract.from_explorer(
+        config["networks"][network.show_active()]["faketoken"]
+    )
+    balance = account.balance()
+    if balance < web3.toWei("2", "ether"):
+        print("prepare at least 2 rinkebyETH to run this project")
+        exit()
+    else:
+        account.transfer(secAcc, web3.toWei("1", "ether"))
+        fakeToken.faucet(secAcc, {"from": account})
 
 
 def deployManagerVRF(owner):
@@ -13,13 +27,11 @@ def deployManagerVRF(owner):
         coordinator, link.address, {"from": owner}, publish_source=True
     )
     contract.tx.wait(5)
-    link.approve(contract.address, linkAmount, {"from": owner}, publish_source=True)
-    deposit_tx = contract.topUpLink(linkAmount, {"from": owner}, publish_source=True)
+    link.approve(contract.address, linkAmount, {"from": owner})
+    deposit_tx = contract.topUpLink(linkAmount, {"from": owner})
     deposit_tx.wait(5)
 
-    topup_sub_tx = contract.topUpSubscription(
-        linkAmount, {"from": owner}, publish_source=True
-    )
+    topup_sub_tx = contract.topUpSubscription(linkAmount, {"from": owner})
     topup_sub_tx.wait(5)
 
 
@@ -28,7 +40,7 @@ def deployEscrow(owner):
     coordinator = config["networks"][network.show_active()]["coordinator"]
     weth = config["networks"][network.show_active()]["weth"]
     keyhash = config["networks"][network.show_active()]["keyhash"]
-    subscriptionId = manager.getSubscriptionId({"from": owner}, publish_source=True)
+    subscriptionId = manager.getSubscriptionId({"from": owner})
 
     print("Deploy Escrow NFT Contract")
     contract = EscrowNFT.deploy(
@@ -45,19 +57,15 @@ def deployEscrow(owner):
     )
     contract.tx.wait(5)
 
-    tx_add_consumer = manager.addConsumer(
-        contract.address, {"from": owner}, publish_source=True
-    )
+    tx_add_consumer = manager.addConsumer(contract.address, {"from": owner})
     tx_add_consumer.wait(5)
 
-    tx_request_number = contract.requestRandomWords(
-        {"from": owner}, publish_source=True
-    )
+    tx_request_number = contract.requestRandomWords({"from": owner})
     tx_request_number.wait(5)
 
 
 def deployNFT(owner):
-    nftPrice = web3.toWei("0.5", "ether")
+    nftPrice = web3.toWei("0.001", "ether")
     print("Deploy MyNFT Contract")
     contract = MyNFT.deploy(
         "NFT Testnet",
@@ -74,6 +82,8 @@ def deployNFT(owner):
 
 def main():
     owner = get_account()[0]
+    secAcc = get_account()[1]
+    checkBalanceAndFaucet(owner, secAcc)
     deployManagerVRF(owner)
     deployEscrow(owner)
     deployNFT(owner)
