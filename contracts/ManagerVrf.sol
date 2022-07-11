@@ -62,7 +62,7 @@ contract ManagerVrf is Ownable {
         linkToken.transfer(to, amount);
     }
 
-    function getSubscriptionId() external view onlyOwner returns(uint64) {
+    function getSubscriptionId() external view onlyOwner returns (uint64) {
         return subscriptionId;
     }
 }

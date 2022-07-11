@@ -50,15 +50,43 @@ contract EscrowNFT is VRFConsumerBaseV2, Ownable {
     RekberData rekberData;
 
     mapping(uint256 => RekberData) public sellerToBuyer;
-    mapping(uint256 => mapping(address => uint256)) private userBalance;
+    mapping(uint256 => mapping(address => uint256)) public userBalance;
     mapping(address => uint256) private contractBalance;
-    
-    event AdminClaimBalance(address _adminAddress, address _tokenAddress, uint256 _tokenAmount);
-    event NewEscrow(uint256 _escrowId, uint256 _tokenId, address _nftAddress, address _sellerAddress, address _buyerAddress);
-    event NewPayment(uint256 _escrowId, address _buyerAddress, address _sellerAddress, uint256 _paymentAmount);
-    event NewRejectPayment(address _buyerAddress, address _sellerAddress, uint256 _tokenId);
-    event NewCancleEscrow(uint256 _escrowId, address _sellerAddress, address _nftAddress, uint256 _tokenId);
-    event ClaimPayment(address _sellerAddress, address _paymentAddress, uint256 _balanceAmount);
+
+    event AdminClaimBalance(
+        address _adminAddress,
+        address _tokenAddress,
+        uint256 _tokenAmount
+    );
+    event NewEscrow(
+        uint256 _escrowId,
+        uint256 _tokenId,
+        address _nftAddress,
+        address _sellerAddress,
+        address _buyerAddress
+    );
+    event NewPayment(
+        uint256 _escrowId,
+        address _buyerAddress,
+        address _sellerAddress,
+        uint256 _paymentAmount
+    );
+    event NewRejectPayment(
+        address _buyerAddress,
+        address _sellerAddress,
+        uint256 _tokenId
+    );
+    event NewCancleEscrow(
+        uint256 _escrowId,
+        address _sellerAddress,
+        address _nftAddress,
+        uint256 _tokenId
+    );
+    event ClaimPayment(
+        address _sellerAddress,
+        address _paymentAddress,
+        uint256 _balanceAmount
+    );
 
     modifier onlySeller(uint256 _escrowId) {
         require(sellerToBuyer[_escrowId].sellerAddress == msg.sender);
@@ -126,17 +154,24 @@ contract EscrowNFT is VRFConsumerBaseV2, Ownable {
         require(contractBalance[_tokenAddress] > 0);
         uint256 tokenAmount = contractBalance[_tokenAddress];
         contractBalance[_tokenAddress] = 0;
-        if(_tokenAddress == WETH) {
+        if (_tokenAddress == WETH) {
             IWETH(_tokenAddress).withdraw(tokenAmount);
             (bool status, ) = msg.sender.call{value: tokenAmount}("");
             require(status);
-        }else {
+        } else {
             IERC20(_tokenAddress).transfer(msg.sender, tokenAmount);
         }
         emit AdminClaimBalance(msg.sender, _tokenAddress, tokenAmount);
     }
 
-    function createEscrow(uint256 _tokenId, uint256 _paymentAmount, address _nftAddress, address _paymentAddress, address _buyerAddress, Payment _payment) external {
+    function createEscrow(
+        uint256 _tokenId,
+        uint256 _paymentAmount,
+        address _nftAddress,
+        address _paymentAddress,
+        address _buyerAddress,
+        Payment _payment
+    ) external {
         require(_paymentAmount > 0);
         require(_nftAddress != address(0));
         require(_paymentAddress != address(0));
@@ -153,42 +188,110 @@ contract EscrowNFT is VRFConsumerBaseV2, Ownable {
         rekberData.payment = _payment;
         uint256 escrowId = _generateEscrowId(_tokenId, _buyerAddress);
         sellerToBuyer[escrowId] = rekberData;
-        emit NewEscrow(escrowId, _tokenId, _nftAddress, msg.sender, _buyerAddress);
+        emit NewEscrow(
+            escrowId,
+            _tokenId,
+            _nftAddress,
+            msg.sender,
+            _buyerAddress
+        );
     }
 
-    function payWithEther(uint256 _escrowId) external payable onlyBuyer(_escrowId) checkAmount(_escrowId, msg.value) {
+    function payWithEther(uint256 _escrowId)
+        external
+        payable
+        onlyBuyer(_escrowId)
+        checkAmount(_escrowId, msg.value)
+    {
         require(sellerToBuyer[_escrowId].status == Status.Pending);
         (uint256 platformFee, uint256 userReceive) = _calculateFee(msg.value);
         sellerToBuyer[_escrowId].status = Status.Accept;
         IWETH(WETH).deposit{value: msg.value}();
         assert(IWETH(WETH).transfer(address(this), msg.value));
-        userBalance[_escrowId][WETH].add(userReceive);
-        contractBalance[WETH].add(platformFee);
-        emit NewPayment(_escrowId, msg.sender, sellerToBuyer[_escrowId].sellerAddress, msg.value);
+        userBalance[_escrowId][WETH] = userBalance[_escrowId][WETH].add(
+            userReceive
+        );
+        contractBalance[WETH] = contractBalance[WETH].add(platformFee);
+        IERC721(sellerToBuyer[_escrowId].nftAddress).transferFrom(
+            address(this),
+            msg.sender,
+            sellerToBuyer[_escrowId].tokenId
+        );
+        emit NewPayment(
+            _escrowId,
+            msg.sender,
+            sellerToBuyer[_escrowId].sellerAddress,
+            msg.value
+        );
     }
 
-    function payWithToken(uint256 _escrowId, uint256 _tokenAmount) external onlyBuyer(_escrowId) checkAmount(_escrowId, _tokenAmount) {
+    function payWithToken(uint256 _escrowId, uint256 _tokenAmount)
+        external
+        onlyBuyer(_escrowId)
+        checkAmount(_escrowId, _tokenAmount)
+    {
         require(sellerToBuyer[_escrowId].status == Status.Pending);
         sellerToBuyer[_escrowId].status = Status.Accept;
-        (uint256 platformFee, uint256 userReceive) = _calculateFee(_tokenAmount);
-        IERC20(sellerToBuyer[_escrowId].paymentAddress).transferFrom(msg.sender, address(this), _tokenAmount);
-        userBalance[_escrowId][sellerToBuyer[_escrowId].paymentAddress].add(userReceive);
-        contractBalance[sellerToBuyer[_escrowId].paymentAddress].add(platformFee);
-        emit NewPayment(_escrowId, sellerToBuyer[_escrowId].buyerAddress, msg.sender, _tokenAmount);
+        (uint256 platformFee, uint256 userReceive) = _calculateFee(
+            _tokenAmount
+        );
+        IERC20(sellerToBuyer[_escrowId].paymentAddress).transferFrom(
+            msg.sender,
+            address(this),
+            _tokenAmount
+        );
+        userBalance[_escrowId][
+            sellerToBuyer[_escrowId].paymentAddress
+        ] = userBalance[_escrowId][sellerToBuyer[_escrowId].paymentAddress].add(
+            userReceive
+        );
+        contractBalance[
+            sellerToBuyer[_escrowId].paymentAddress
+        ] = contractBalance[sellerToBuyer[_escrowId].paymentAddress].add(
+            platformFee
+        );
+        IERC721(sellerToBuyer[_escrowId].nftAddress).transferFrom(
+            address(this),
+            msg.sender,
+            sellerToBuyer[_escrowId].tokenId
+        );
+        emit NewPayment(
+            _escrowId,
+            sellerToBuyer[_escrowId].buyerAddress,
+            msg.sender,
+            _tokenAmount
+        );
     }
 
     function rejectPayment(uint256 _escrowId) external onlyBuyer(_escrowId) {
         require(sellerToBuyer[_escrowId].status == Status.Pending);
         sellerToBuyer[_escrowId].status = Status.Reject;
-        IERC721(sellerToBuyer[_escrowId].nftAddress).safeTransferFrom(address(this), sellerToBuyer[_escrowId].sellerAddress, sellerToBuyer[_escrowId].tokenId);
-        emit NewRejectPayment(msg.sender, sellerToBuyer[_escrowId].sellerAddress, sellerToBuyer[_escrowId].tokenId);
+        IERC721(sellerToBuyer[_escrowId].nftAddress).safeTransferFrom(
+            address(this),
+            sellerToBuyer[_escrowId].sellerAddress,
+            sellerToBuyer[_escrowId].tokenId
+        );
+        emit NewRejectPayment(
+            msg.sender,
+            sellerToBuyer[_escrowId].sellerAddress,
+            sellerToBuyer[_escrowId].tokenId
+        );
     }
 
     function cancleEscrow(uint256 _escrowId) external onlySeller(_escrowId) {
         require(sellerToBuyer[_escrowId].status == Status.Pending);
         sellerToBuyer[_escrowId].status = Status.Canceled;
-        IERC721(sellerToBuyer[_escrowId].nftAddress).safeTransferFrom(address(this), msg.sender, sellerToBuyer[_escrowId].tokenId);
-        emit NewCancleEscrow(_escrowId, msg.sender, sellerToBuyer[_escrowId].nftAddress,sellerToBuyer[_escrowId].tokenId);
+        IERC721(sellerToBuyer[_escrowId].nftAddress).safeTransferFrom(
+            address(this),
+            msg.sender,
+            sellerToBuyer[_escrowId].tokenId
+        );
+        emit NewCancleEscrow(
+            _escrowId,
+            msg.sender,
+            sellerToBuyer[_escrowId].nftAddress,
+            sellerToBuyer[_escrowId].tokenId
+        );
     }
 
     function claimPayment(uint256 _escrowId) external onlySeller(_escrowId) {
@@ -196,34 +299,44 @@ contract EscrowNFT is VRFConsumerBaseV2, Ownable {
         address paymentAddress = sellerToBuyer[_escrowId].paymentAddress;
         uint256 balanceAmount = userBalance[_escrowId][paymentAddress];
         userBalance[_escrowId][paymentAddress] = 0;
-        if(paymentAddress == WETH) {
+        if (paymentAddress == WETH) {
             IWETH(paymentAddress).withdraw(balanceAmount);
             (bool status, ) = msg.sender.call{value: balanceAmount}("");
             require(status);
-        }else {
+        } else {
             IERC20(paymentAddress).transfer(msg.sender, balanceAmount);
         }
         emit ClaimPayment(msg.sender, paymentAddress, balanceAmount);
     }
 
-    function _calculateFee(uint256 _paymentAmount) private view returns(uint256 platformFee, uint256 userReceive) {
+    function _calculateFee(uint256 _paymentAmount)
+        private
+        view
+        returns (uint256 platformFee, uint256 userReceive)
+    {
         platformFee = _paymentAmount.div(100).mul(fee);
         userReceive = _paymentAmount.sub(platformFee);
     }
 
-    function _generateEscrowId(uint256 _nftId, address _buyerAddress) private view returns(uint256 escrowId) {
+    function _generateEscrowId(uint256 _nftId, address _buyerAddress)
+        private
+        view
+        returns (uint256 escrowId)
+    {
         uint256 id = (randomWords[0] % block.timestamp) + 1;
-        escrowId = uint256(
-            keccak256(
-                abi.encode(
-                    randomWords[1],
-                    id,
-                    block.timestamp,
-                    msg.sender,
-                    _nftId,
-                    _buyerAddress
+        escrowId =
+            uint256(
+                keccak256(
+                    abi.encode(
+                        randomWords[1],
+                        id,
+                        block.timestamp,
+                        msg.sender,
+                        _nftId,
+                        _buyerAddress
+                    )
                 )
-            )
-        ) % escrowModulus;
+            ) %
+            escrowModulus;
     }
 }

@@ -32,6 +32,7 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
     string private baseURI;
     uint256 private _maxSupply;
     uint256 private _mintingPrice;
+    uint256 private balance;
     address private WETH;
     Counters.Counter private _totalSupply;
 
@@ -540,9 +541,17 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
         uint256 tokenId
     ) internal virtual {}
 
-    function _calculatePayment(uint256 _tokenMount) internal view returns(uint256) {
+    function _calculatePayment(uint256 _tokenMount)
+        internal
+        view
+        returns (uint256)
+    {
         require(_tokenMount > 0);
         return _tokenMount.mul(_mintingPrice);
+    }
+
+    receive() external payable {
+        assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
     }
 
     function buyMyNFT(uint256 amount_) external payable {
@@ -550,6 +559,7 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
         require(_calculatePayment(amount_) == msg.value);
         IWETH(WETH).deposit{value: msg.value}();
         assert(IWETH(WETH).transfer(address(this), msg.value));
+        balance = balance.add(msg.value);
         for (uint256 i = 1; i <= amount_; i++) {
             _totalSupply.increment();
             _safeMint(msg.sender, _totalSupply.current(), "");
@@ -557,9 +567,10 @@ contract MyNFT is Context, ERC165, IERC721, IERC721Metadata, Ownable {
     }
 
     function claimPayment() external onlyOwner {
-        IWETH weth = IWETH(WETH);
-        weth.withdraw(IERC20(WETH).balanceOf(address(this)));
-        (bool status, ) = msg.sender.call{value: IERC20(WETH).balanceOf(address(this))}("");
+        uint256 amount = balance;
+        balance = 0;
+        IWETH(WETH).withdraw(amount);
+        (bool status, ) = msg.sender.call{value: amount}("");
         require(status);
     }
 }
