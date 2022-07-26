@@ -18,12 +18,20 @@ contract ManagerVrf is Ownable {
         _createNewSubscription();
     }
 
+    modifier amountMax(uint256 amount) {
+        require(amount > 0);
+        _;   
+    }
+    modifier verifyDefaultAddress(address consumerAddress) {
+        require(consumerAddress != address(0)) ;
+        _;
+    }
+
     function _createNewSubscription() private onlyOwner {
         subscriptionId = coordinator.createSubscription();
     }
 
-    function topUpSubscription(uint256 amount) external onlyOwner {
-        require(amount > 0);
+    function topUpSubscription(uint256 amount) external onlyOwner amountMax(amount){
         linkToken.transferAndCall(
             address(coordinator),
             amount,
@@ -31,20 +39,18 @@ contract ManagerVrf is Ownable {
         );
     }
 
-    function topUpLink(uint256 _amount) external onlyOwner {
-        require(_amount > 0);
-        linkToken.transferFrom(msg.sender, address(this), _amount);
+    function topUpLink(uint256 amount) external onlyOwner amountMax(amount){
+        linkToken.transferFrom(msg.sender, address(this), amount);
     }
 
-    function addConsumer(address consumerAddress) external onlyOwner {
-        require(consumerAddress != address(0));
+
+    function addConsumer(address consumerAddress) external onlyOwner verifyDefaultAddress(consumerAddress){
         require(!subScriptionStatus[consumerAddress]);
         coordinator.addConsumer(subscriptionId, consumerAddress);
         subScriptionStatus[consumerAddress] = true;
     }
 
     function removeConsumer(address consumerAddress) external onlyOwner {
-        require(consumerAddress != address(0));
         require(subScriptionStatus[consumerAddress]);
         coordinator.removeConsumer(subscriptionId, consumerAddress);
         subScriptionStatus[consumerAddress] = false;
@@ -56,9 +62,8 @@ contract ManagerVrf is Ownable {
         subscriptionId = 0;
     }
 
-    function withdraw(uint256 amount, address to) external onlyOwner {
+    function withdraw(uint256 amount, address to) external onlyOwner amountMax(amount){
         require(to != address(0));
-        require(amount > 0);
         linkToken.transfer(to, amount);
     }
 
